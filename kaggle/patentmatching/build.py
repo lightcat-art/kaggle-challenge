@@ -26,7 +26,6 @@ import os
 server_config = Config(None, PARAM.FILE_CONFIG)
 path_manager = PathManager()
 model_config = ModelConfigManager()
-model_config.init(None, PARAM.FILE_MODEL_CONFIG)
 PATH_HOME = server_config.get_param(PARAM.PARAM_PATH_HOME, "./")
 TASK_NAME = TaskMap.PATENTMATCHING.name  # modelConfig.json의 TASK_NAME과 동일해야함
 logger = LogManager().get_logger(TASK_NAME, PARAM.LOG_COMMON_FILE)

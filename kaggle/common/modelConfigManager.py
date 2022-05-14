@@ -1,6 +1,7 @@
 import re
 import os
 import json
+from kaggle.common.params import PARAM
 
 """
     modelConfig.json 파일 작성방법
@@ -62,6 +63,7 @@ class ModelConfigManager:
         """
         if cls.__instance is None:
             cls.__instance = object.__new__(cls, *args, **kwargs)
+            cls.__instance.init(None, PARAM.FILE_MODEL_CONFIG)
         return cls.__instance
 
     def init(self, default=None, json_file=None):
