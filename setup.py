@@ -24,11 +24,12 @@ def get_requirements(path='requirements.txt'):
         return []
 
 
+name = 'kaggle-module'
 option = 'kaggle-source-only'
 
 if option == 'kaggle-module':
     setup(
-        name=option,
+        name=name,
         version=get_version(path='version'),
         description='kaggle',
         author='dhk',
@@ -41,7 +42,7 @@ if option == 'kaggle-module':
     )
 elif option == 'kaggle-source-only':
     setup(
-        name=option,
+        name=name,
         version=get_version(path='version'),
         description='kaggle',
         author='dhk',

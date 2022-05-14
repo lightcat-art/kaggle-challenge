@@ -5,10 +5,15 @@
 관리를 담당한다.
 """
 
+import os
 import logging
+from logging.handlers import RotatingFileHandler
+from absl import logging as absl_logging
+
 from kaggle.common.pathManager import PathManager
 from kaggle.common.config import Config
 from kaggle.common.params import PARAM
+from kaggle.common.languagePack import LANGPACK
 
 
 class LogManager:
@@ -74,3 +79,63 @@ class LogManager:
 
         if filename is None:
             filename = logger_name + ".log"
+
+        else:
+            # cls._log_path는 디렉토리이고, filename에 디렉토리설정이 있는지 판단하여 isdir로 디렉토리존재여부 확인하고 없으면 makedir
+            file_path = os.path.join(cls._log_path, os.path.dirname(filename))
+            if not os.path.isdir(file_path):
+                os.makedirs(file_path, exist_ok=True)
+
+        if filename not in cls.__HANDLERS:
+            file_handler = RotatingFileHandler(os.path.join(cls._log_path, filename),
+                                               mode="wt",
+                                               maxBytes=PARAM.LOG_MAX_BYTES,
+                                               backupCount=PARAM.LOG_BACKUP_COUNT,
+                                               encoding="utf-8")
+            file_handler.setFormatter(logging.Formatter(PARAM.LOG_FORMAT, style="{"))
+            file_handler.setLevel(cls._log_level)
+            cls.__HANDLERS[filename] = file_handler
+        else:
+            file_handler = cls.__HANDLERS[filename]
+
+        # 없으면 새로 생성
+        logger = logging.getLogger(logger_name)
+        logger.addHandler(file_handler)
+        logger.setLevel(cls._log_level)
+        logger.info(LANGPACK.START_LOG.format(logger_name, filename))
+
+        cls.__LOGGERS[logger_name] = logger
+
+        return logger
+
+
+    @classmethod
+    def close_logger(cls, logger_name):
+        """
+        해당하는 로거를 닫고 Pool에서 제거한다.
+
+        Args:
+            logger_name (str) : 삭제할 로거의 이름.
+
+        Returns:
+            boolean : 성공여부.
+        """
+        # 인자를 확인한다.
+        if logger_name is None or logger_name == "":
+            return False
+
+        # 로거가 Pool에 있는지 확인
+        if logger_name not in cls.__LOGGERS:
+            return True
+
+        #로거 닫기
+        logger = cls.__LOGGERS.pop(logger_name)
+
+        logger.info(LANGPACK.END_LOG.format(logger_name))
+
+        logger.flush()
+        logger.close()
+
+        del logger
+
+        return True

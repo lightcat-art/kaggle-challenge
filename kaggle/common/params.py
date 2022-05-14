@@ -28,15 +28,48 @@ class Params:
         return "config"
 
     @property
-    def PACKAGE_NAME(self):
+    def PATH_MODEL(self):
+        return "model"
+
+    @property
+    def PATH_DATA(self):
+        return "data"
+
+    @property
+    def CUR_PACKAGE_NAME(self):
         packagePath = os.getcwd().split('\\')
-        print(packagePath)
+        # print(packagePath)
         return packagePath[len(packagePath) - 1]
+
+    # 로그 관련 설정값
+    @property
+    def LOG_FORMAT(self):
+        return "{asctime} [{levelname[0]}] > {message}    < in [{filename}:{lineno:04}]"
+
+    @property
+    def LOG_MAX_BYTES(self):
+        return 1024 * 1024 * 100  # 100MB
+
+    @property
+    def LOG_BACKUP_COUNT(self):
+        return 10
+
+    @property
+    def LOG_COMMON_FILE(self):
+        return "server.log"
 
     # 기본 파일명
     @property
     def FILE_CONFIG(self):
-        return os.path.join(".", Params().PATH_CONFIG, "config.json")
+        return os.path.join(".", Params().PATH_CONFIG, "serverConfig.json")
+
+    @property
+    def FILE_LANGPACK_CONFIG(self):
+        return os.path.join(".", Params().PATH_CONFIG, "language.json")
+
+    @property
+    def FILE_MODEL_CONFIG(self):
+        return os.path.join(".", Params().PATH_CONFIG, "modelConfig.json")
 
     # 파라미터 이름
     @property
@@ -59,13 +92,42 @@ class Params:
     def PARAM_RESOURCES_FOLDER(self):
         return "RESOURCES_FOLDER"
 
+    # 학습관련 파라미터
+    @property
+    def PARAM_PACKAGE_NAME(self):
+        return "PACKAGE_NAME"
+
+    @property
+    def PARAM_LEARN_TYPE(self):
+        return "LEARN_TYPE"
+
+    @property
+    def PARAM_MODEL_NAME(self):
+        return "MODEL_NAME"
+
+    @property
+    def PARAM_BATCH_SIZE(self):
+        return "BATCH_SIZE"
+
     @property
     def PARAM_EPOCHS(self):
         return "EPOCHS"
 
     @property
-    def PARAM_BATCH_SIZE(self):
-        return "BATCH_SIZE"
+    def PARAM_OPTIMIZER(self):
+        return "OPTIMIZER"
+
+    @property
+    def PARAM_LOSS(self):
+        return "LOSS"
+
+    @property
+    def PARAM_METRICS(self):
+        return "METRICS"
+
+    @property
+    def PARAM_VAL_SPLIT(self):
+        return "VAL_SPLIT"
 
 
 # 여기서 그냥 instance 생성해둠.
@@ -73,3 +135,4 @@ PARAM = Params()
 
 if __name__ == "__main__":
     print(PARAM.PARAM_RESOURCES_HOME)
+    print(PARAM.PACKAGE_NAME)

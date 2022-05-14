@@ -1,0 +1,22 @@
+{
+  "PATENTMATCHING": {
+    "1": {
+      "MODEL_NAME": "MseModel_EPOCH_2",
+      "BATCH_SIZE": 64,
+      "EPOCHS": 2,
+      "OPTIMIZER": "rmsprop",
+      "LOSS": "mse",
+      "METRICS": "accuracy",
+      "VAL_SPLIT": 0.2
+    },
+    "2": {
+      "MODEL_NAME": "MseModel2",
+      "BATCH_SIZE": 64,
+      "EPOCHS": 200,
+      "OPTIMIZER": "rmsprop",
+      "LOSS": "mse",
+      "METRICS": "accuracy",
+      "VAL_SPLIT": 0.2
+    }
+  }
+}
