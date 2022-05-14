@@ -17,6 +17,7 @@ from kaggle.common.modelConfigManager import ModelConfigManager
 from kaggle.common.pathManager import PathManager
 from kaggle.common.logManager import LogManager
 from kaggle.common.params import PARAM
+from kaggle.common.classificationCode import TaskMap
 from kaggle.tensorflow.customCallback import CustomCallback
 import os
 
@@ -27,14 +28,14 @@ path_manager = PathManager()
 model_config = ModelConfigManager()
 model_config.init(None, PARAM.FILE_MODEL_CONFIG)
 PATH_HOME = server_config.get_param(PARAM.PARAM_PATH_HOME, "./")
-TASK_NAME = "PATENTMATCHING"  # modelConfig.json의 TASK_NAME과 동일해야함
+TASK_NAME = TaskMap.PATENTMATCHING.name  # modelConfig.json의 TASK_NAME과 동일해야함
 logger = LogManager().get_logger(TASK_NAME, PARAM.LOG_COMMON_FILE)
 
 
 class FirstModel:
 
     def __init__(self):
-        self.MODEL_TYPE = '1'  # modelConfig.json의 MODEL_TYPE과 동일해야함
+        self.MODEL_TYPE = TaskMap.PATENTMATCHING.value.get('MSE')  # modelConfig.json의 MODEL_TYPE과 동일해야함
         self.model_config_dict = model_config.get_task_model_config(TASK_NAME, self.MODEL_TYPE)
         self.train_1_X = None
         self.train_2_X = None
