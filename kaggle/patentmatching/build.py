@@ -11,6 +11,7 @@ from tensorflow.keras.models import Model
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 from sklearn.metrics.pairwise import cosine_similarity
 from tensorflow.keras.utils import to_categorical
+from tensorflow.keras.losses import CosineSimilarity, Reduction
 from datetime import datetime
 from kaggle.common.config import Config
 from kaggle.common.modelConfigManager import ModelConfigManager
@@ -129,7 +130,7 @@ class FirstModel:
         # x_norm = normalize(x, axis=2, order=1)
         # y_norm = normalize(y, axis=2, order=1)
         anchor_norm = self.customNorm(anchor_output, axis=1)
-        anchor_norm = tf.expand_dims(anchor_norm, 1)
+        anchor_norm = tf.expand_dims(anchor_norm, 2)
         # anchor_norm = tf.expand_dims(anchor_norm, 1)
         # anchor_norm = Flatten()(anchor_norm)
         logger.debug('anchor norm shape : {}'.format(anchor_norm.shape))
@@ -144,7 +145,10 @@ class FirstModel:
         # print(Flatten()(target_norm).shape)
 
         # 그냥 * 로는 원하는 모양으로 행렬곱이 되지 않아 matmul 사용
-        cosine_sim = tf.matmul(anchor_norm, target_norm)
+        # cosine_sim = tf.matmul(anchor_norm, target_norm)
+        cosine_loss = CosineSimilarity(axis=1, reduction=Reduction.NONE)
+        cosine_sim = cosine_loss(anchor_norm, target_norm)
+
         logger.debug('after matmul cosine_sim shape : {}'.format(cosine_sim.shape))
         cosine_sim = tf.reshape(cosine_sim, [-1, 1])
         logger.debug('after matmul cosine_sim shape : {}'.format(cosine_sim.shape))
@@ -197,6 +201,8 @@ class FirstModel:
                                      self.model_config_dict.get(PARAM.PARAM_MODEL_NAME)))
 
     def loadModel(self):
+        logger.debug('load model start')
+        logger.debug('model name = {}'.format(self.model_config_dict.get(PARAM.PARAM_MODEL_NAME)))
         self.model = keras.models.load_model(os.path.join(path_manager.get_model_path(TASK_NAME, self.MODEL_TYPE),
                                                           self.model_config_dict.get(PARAM.PARAM_MODEL_NAME)))
         self.preprocessing()
@@ -283,30 +289,25 @@ class Test:
 
         print('lstm output shape : ', anchor_output.shape, target_output.shape)
 
-        # x_norm = normalize(x, axis=2, order=1)
-        # y_norm = normalize(y, axis=2, order=1)
-        anchor_norm = self.customNorm(anchor_output, axis=1)
-        anchor_norm = tf.expand_dims(anchor_norm, 1)
-        # anchor_norm = tf.expand_dims(anchor_norm, 1)
-        # anchor_norm = Flatten()(anchor_norm)
+        # anchor_output = self.customNorm(anchor_output, axis=1)
+        anchor_norm = tf.expand_dims(anchor_output, 2)
         print('anchor norm shape : ', anchor_norm.shape)
 
-        target_norm = self.customNorm(target_output, axis=1)
-        target_norm = tf.expand_dims(target_norm, 2)
-        # target_norm = tf.expand_dims(target_norm, 1)
-        # target_norm = Flatten()(target_norm)
+        # anchor_output = self.customNorm(target_output, axis=1)
+        target_norm = tf.expand_dims(anchor_output, 2)
         print('target norm shape : ', target_norm.shape)
-        # print('transpose target shape : ',tf.transpose(target_norm).shape)
-        # print(Flatten()(anchor_norm).shape)
-        # print(Flatten()(target_norm).shape)
 
         # 그냥 * 로는 원하는 모양으로 행렬곱이 되지 않아 matmul 사용
-        cosine_sim = tf.matmul(anchor_norm, target_norm)
+        # cosine_sim = tf.matmul(anchor_norm, target_norm)
+
+        cosine_loss = CosineSimilarity(axis=1, reduction=Reduction.NONE)
+        cosine_sim = cosine_loss(anchor_norm, target_norm)
+
         print('after matmul cosine_sim shape : ', cosine_sim.shape)
-        print('after matmul cosine_sim : ', cosine_sim)
+        # print('after matmul cosine_sim : ', cosine_sim)
         cosine_sim = tf.reshape(cosine_sim, [-1, 1])
-        print('after matmul cosine_sim shape : ', cosine_sim.shape)
-        print('after matmul cosine_sim : ', cosine_sim)
+        print('after matmul cosine_sim shape2 : ', cosine_sim.shape)
+        # print('after matmul cosine_sim2 : ', cosine_sim)
 
         # 3d shape tensor 그 이상에서는 행렬곱을 하고싶은 위치만 transpose되어야 행렬곱 가능.
         # expand_dims로 shape 조정 (복잡할때는 transpose이용하여 shape 조정 가능)
@@ -315,10 +316,8 @@ class Test:
 
         # cosine_sim = Flatten()(cosine_sim)
 
-        print(cosine_sim)
         print('min value : ', min(cosine_sim), ', max value : ', max(cosine_sim))
         cosine_sim = (cosine_sim + 1) / 2
-        print(cosine_sim)
         print('min value : ', min(cosine_sim), ', max value : ', max(cosine_sim))
 
         print('cosine sim shape : ', cosine_sim.shape)
@@ -326,17 +325,18 @@ class Test:
     def customNorm(self, tensor, axis=1):
         print('customNorm : input tensor shape = ', tensor.shape)
         # print(tensor)
-        # reduceMean = tf.reduce_mean(tensor, axis=axis)
-        norm = tf.norm(tensor, ord=1, axis=axis)
-        print('customNorm : norm val shape = ', norm)
+        # norm = tf.norm(tensor, ord=1, axis=axis)
+        norm = tf.nn.l2_normalize(tensor,axis=axis)
+        # print('customNorm : norm val shape = ', norm)
         norm = tf.expand_dims(norm, 1)
 
         normTensor = tensor / norm
 
-        print('customNorm : after norm = ', normTensor)
+        # print('customNorm : after norm = ', normTensor)
         print('customNorm : after norm shape = ', normTensor.shape)
 
         return tensor
+
 
 
 if __name__ == "__main__":
