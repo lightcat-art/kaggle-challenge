@@ -1,9 +1,10 @@
 {
   "PATENTMATCHING": {
     "1": {
-      "MODEL_NAME": "MseModel_EPOCH_2",
+      "MODEL_NAME": "MseModel_EPOCH_200_BATCH_64_V1",
+      "MODEL_CHECKPOINT_NAME": "ckpt_{epoch:03d}_{val_loss:.5f}_{val_accuracy:.5f}",
       "BATCH_SIZE": 64,
-      "EPOCHS": 2,
+      "EPOCHS": 200,
       "OPTIMIZER": "rmsprop",
       "LOSS": "mse",
       "METRICS": "accuracy",

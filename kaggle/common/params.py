@@ -32,6 +32,10 @@ class Params:
         return "model"
 
     @property
+    def PATH_CHECKPOINT(self):
+        return "checkpoint"
+
+    @property
     def PATH_DATA(self):
         return "data"
 
@@ -104,6 +108,10 @@ class Params:
     @property
     def PARAM_MODEL_NAME(self):
         return "MODEL_NAME"
+
+    @property
+    def PARAM_MODEL_CHECKPOINT_NAME(self):
+        return "MODEL_CHECKPOINT_NAME"
 
     @property
     def PARAM_BATCH_SIZE(self):

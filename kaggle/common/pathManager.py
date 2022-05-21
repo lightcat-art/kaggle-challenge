@@ -5,6 +5,7 @@ import os
 import traceback
 
 
+
 class PathManager:
     """
     딥러닝에서 사용하는 모든 Path를 관리한다.
@@ -53,6 +54,22 @@ class PathManager:
             except Exception as e:
                 traceback.print_exc()
 
+    def _clear_file(self, target_path):
+        """
+        폴더경로가 있는지 확인하고 있으면 폴더 내 파일을 지움
+        :param target_path:
+        :return:
+        """
+        if os.path.isdir(target_path):
+            try:
+                for file in os.scandir(target_path):
+                    os.remove(file.path)
+                return True
+            except Exception as e:
+                traceback.print_exc()
+        else:
+            return False
+
     def get_log_path(self):
         """
         로그 폴더를 반환한다.
@@ -100,7 +117,7 @@ class PathManager:
 
     def get_model_path(self, task_name, model_type):
         """
-        특정 패키지에서 사용하는 모델폴더 경로
+        TASK에서 사용하는 모델폴더 경로
 
         Returns:
             str : 대상 모델 폴더의 전체 경로
@@ -109,5 +126,22 @@ class PathManager:
             os.path.join(self._PATH_RESOURCES_HOME, self._PATH_RESOURCES_FOLDER, task_name, model_type,
                          PARAM.PATH_MODEL))
         self._check_path(target_path)
+
+        return target_path
+
+    def get_checkpoint_path(self, task_name, model_type, model_name, clear_option=False):
+        """
+        TASK의 체크포인트 저장할 폴더 경로
+
+        Returns:
+            str :
+        """
+        target_path = os.path.abspath(
+            os.path.join(self._PATH_RESOURCES_HOME, self._PATH_RESOURCES_FOLDER, task_name, model_type,
+                         PARAM.PATH_CHECKPOINT, model_name))
+        self._check_path(target_path)
+        if clear_option:
+            clearResult = self._clear_file(target_path)
+            print('clear result = {}'.format(clearResult))
 
         return target_path

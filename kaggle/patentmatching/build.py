@@ -1,6 +1,7 @@
 import numpy as np
 import math
 import pandas as pd
+import tensorflow.keras.callbacks
 import tensorflow_datasets as tfds
 from keras.layers import Flatten
 from tensorflow import keras
@@ -20,6 +21,7 @@ from kaggle.common.logManager import LogManager
 from kaggle.common.params import PARAM
 from kaggle.common.classificationCode import TaskMap
 from kaggle.tensorflow.customCallback import CustomCallback
+from tensorflow.keras.callbacks import ModelCheckpoint
 import os
 
 # 전역 공통 디렉토리 변수 선언
@@ -79,23 +81,16 @@ class FirstModel:
         self.vocab_size = self.tokenizer.vocab_size
 
         train_X = [self.tokenizer.encode(elem) for elem in result]
-        # print(type(train_X))
+        print('type of train_X : ', type(train_X))
         # print(train_X)
         self.train_X_len = max([len(line) for line in train_X])
+
         train_X_max_val = max([max(line) for line in train_X])
         logger.debug('max_val on train_X : {}'.format(train_X_max_val))
         train_X = pad_sequences(train_X, maxlen=self.train_X_len)
 
         self.train_1_X = train_X[:len(df)]
         self.train_2_X = train_X[len(df):]
-
-        # print('padding 전 anchor : ', self.tokenizer.decode(self.train_1_X[0]))
-        # print('padding 전 target : ', self.tokenizer.decode(self.train_2_X[0]))
-
-        # self.anchor_len = max([len(line) for line in self.train_1_X])
-        # self.target_len = max([len(line) for line in self.train_2_X])
-        # self.train_1_X = pad_sequences(self.train_1_X, maxlen=self.anchor_len)
-        # self.train_2_X = pad_sequences(self.train_2_X, maxlen=self.target_len)
 
         logger.debug('padding 후 anchor shape : [ {} , {} ]'.format(len(self.train_1_X), len(self.train_1_X[0])))
         logger.debug('padding 후 target shape : [ {} , {} ]'.format(len(self.train_2_X), len(self.train_2_X[0])))
@@ -127,46 +122,25 @@ class FirstModel:
 
         logger.debug('lstm output shape : {}, {}'.format(anchor_output.shape, target_output.shape))
 
-        # x_norm = normalize(x, axis=2, order=1)
-        # y_norm = normalize(y, axis=2, order=1)
-        anchor_norm = self.customNorm(anchor_output, axis=1)
-        anchor_norm = tf.expand_dims(anchor_norm, 2)
-        # anchor_norm = tf.expand_dims(anchor_norm, 1)
-        # anchor_norm = Flatten()(anchor_norm)
-        logger.debug('anchor norm shape : {}'.format(anchor_norm.shape))
+        option = 'manual'
 
-        target_norm = self.customNorm(target_output, axis=1)
-        target_norm = tf.expand_dims(target_norm, 2)
-        # target_norm = tf.expand_dims(target_norm, 1)
-        # target_norm = Flatten()(target_norm)
-        logger.debug('target norm shape : {}'.format(target_norm.shape))
-        # print('transpose target shape : ',tf.transpose(target_norm).shape)
-        # print(Flatten()(anchor_norm).shape)
-        # print(Flatten()(target_norm).shape)
-
-        # 그냥 * 로는 원하는 모양으로 행렬곱이 되지 않아 matmul 사용
-        # cosine_sim = tf.matmul(anchor_norm, target_norm)
-        cosine_loss = CosineSimilarity(axis=1, reduction=Reduction.NONE)
-        cosine_sim = cosine_loss(anchor_norm, target_norm)
-
-        logger.debug('after matmul cosine_sim shape : {}'.format(cosine_sim.shape))
-        cosine_sim = tf.reshape(cosine_sim, [-1, 1])
-        logger.debug('after matmul cosine_sim shape : {}'.format(cosine_sim.shape))
-
-        # 3d shape tensor 그 이상에서는 행렬곱을 하고싶은 위치만 transpose되어야 행렬곱 가능.
-        # expand_dims로 shape 조정 (복잡할때는 transpose이용하여 shape 조정 가능)
-
-        # cosine_sim = tf.matmul(anchor_norm, target_norm)
-
-        # cosine_sim = Flatten()(cosine_sim)
+        cosine_sim = self.calc_cosine_sim(anchor_output, option, target_output)
 
         cosine_sim = (cosine_sim + 1) / 2
 
         self.model = Model(inputs=[anchor, target], outputs=cosine_sim)
 
+        metrics = [metrics for metrics in self.model_config_dict.get(PARAM.PARAM_METRICS).split(',')]
         self.model.compile(optimizer=self.model_config_dict.get(PARAM.PARAM_OPTIMIZER),
                            loss=self.model_config_dict.get(PARAM.PARAM_LOSS),
-                           metrics=[metrics for metrics in self.model_config_dict.get(PARAM.PARAM_METRICS).split(',')])
+                           metrics=metrics)
+
+        modelCheckPointFile = os.path.join(
+            path_manager.get_checkpoint_path(TASK_NAME, self.MODEL_TYPE,
+                                             self.model_config_dict.get(PARAM.PARAM_MODEL_NAME), clear_option=True),
+            self.model_config_dict.get(PARAM.PARAM_MODEL_CHECKPOINT_NAME))
+        cpCallback = ModelCheckpoint(filepath=modelCheckPointFile, verbose=1, monitor='val_loss',
+                                     save_weights_only=True, mode='min', save_best_only=True)
 
         # try:
         self.model.fit(x=[self.train_1_X, self.train_2_X], y=self.train_y,
@@ -176,22 +150,57 @@ class FirstModel:
 
                        callbacks=[CustomCallback('callback', self.model_config_dict.get(PARAM.PARAM_EPOCHS),
                                                  self.train_size, self.model_config_dict.get(PARAM.PARAM_BATCH_SIZE),
-                                                 self.model_config_dict.get(PARAM.PARAM_VAL_SPLIT))]
+                                                 self.model_config_dict.get(PARAM.PARAM_VAL_SPLIT), metrics=metrics),
+                                  cpCallback]
                        )
         # except Exception as ex:
         #     print('error occured..', ex)
 
+    def calc_cosine_sim(self, anchor_output, option, target_output):
+        if option == 'useLoss':
+            # anchor_norm = self.customNorm(anchor_output, axis=1)
+            anchor_norm = tf.expand_dims(anchor_output, 2)
+            logger.debug('anchor norm shape : {}'.format(anchor_norm.shape))
+
+            # target_norm = self.customNorm(target_output, axis=1)
+            target_norm = tf.expand_dims(anchor_output, 2)
+            logger.debug('target norm shape : {}'.format(target_norm.shape))
+
+            # 그냥 * 로는 원하는 모양으로 행렬곱이 되지 않아 matmul 사용
+            # 3d shape tensor 그 이상에서는 행렬곱을 하고싶은 위치만 transpose되어야 행렬곱 가능.
+            # expand_dims로 shape 조정 (복잡할때는 transpose이용하여 shape 조정 가능)
+
+            # cosine_sim = tf.matmul(anchor_norm, target_norm)
+
+            cosine_loss = CosineSimilarity(axis=1, reduction=Reduction.NONE)
+            # cosine_loss는 -1로갈수록 유사도가 높아짐.
+            cosine_sim = cosine_loss(anchor_norm, target_norm)
+
+            logger.debug('after matmul cosine_sim shape : {}'.format(cosine_sim.shape))
+            cosine_sim = tf.reshape(cosine_sim, [-1, 1])
+            logger.debug('after matmul cosine_sim shape : {}'.format(cosine_sim.shape))
+
+        elif option == 'manual':
+            anchor_norm = self.customNorm(anchor_output, axis=1)
+            anchor_norm = tf.expand_dims(anchor_norm, 1)
+            logger.debug('anchor norm shape : {}'.format(anchor_norm.shape))
+
+            target_norm = self.customNorm(target_output, axis=1)
+            target_norm = tf.expand_dims(target_norm, 2)
+            logger.debug('target norm shape : {}'.format(target_norm.shape))
+
+            cosine_sim = tf.matmul(anchor_norm, target_norm)
+
+            logger.debug('after matmul cosine_sim shape : {}'.format(cosine_sim.shape))
+            cosine_sim = tf.reshape(cosine_sim, [-1, 1])
+            logger.debug('after matmul cosine_sim shape : {}'.format(cosine_sim.shape))
+        return cosine_sim
+
     def customNorm(self, tensor, axis=1):
-        # print(tensor)
-        # reduceMean = tf.reduce_mean(tensor, axis=axis)
-        norm = tf.norm(tensor, ord=1, axis=axis)
-        norm = tf.expand_dims(norm, 1)
+        norm = tf.nn.l2_normalize(tensor, axis=axis)
+        logger.debug('customNorm : after norm shape = {}'.format(norm.shape))
 
-        normTensor = tensor / norm
-
-        logger.debug('customNorm : after norm shape = {}'.format(normTensor.shape))
-
-        return tensor
+        return norm
 
     def saveModel(self):
         # format_data = "%d%m%y%H%M%S"
@@ -232,7 +241,7 @@ class FirstModel:
         # self.train_1_X = train_X[:len(df)]
         # self.train_2_X = train_X[len(df):]
 
-    def predictTest(self):
+    def predictPartTrainData(self):
         anchor = self.train_1_X[0:2]
         target = self.train_2_X[0:2]
         logger.debug('anchor shape : ({},{})'.format(len(anchor), len(anchor[0])))
@@ -251,63 +260,65 @@ class FirstModel:
         for i in range(100):
             logger.debug('predict score = {}, label = {}'.format(sim[i], self.train_y[i]))
 
-    def predictModel(self, anchor, target):
-        sim = self.model.predict(anchor, target)
+    def predictTestData(self):
+        df = pd.read_csv(os.path.join(path_manager.get_data_path(TASK_NAME, self.MODEL_TYPE), "test.csv"))
+        test_id = df['id']
+        anchor = df['anchor']
+        target = df['target']
+
+        test_1_X = [self.tokenizer.encode(elem) for elem in anchor]
+        test_2_X = [self.tokenizer.encode(elem) for elem in target]
+
+        test_1_X = pad_sequences(test_1_X, maxlen=self.train_X_len)
+        test_2_X = pad_sequences(test_2_X, maxlen=self.train_X_len)
+
+        # print(test_1_X)
+        # print(test_2_X)
+
+        sim = self.model.predict([test_1_X, test_2_X])
+        for i in range(len(test_id)):
+            logger.debug(
+                'predict id ={}, anchor = {}, target = {}, score = {}'.format(test_id[i], anchor[i], target[i], sim[i]))
 
 
 class Test:
     def __init__(self):
-        self.output_dim = 512
+        self.embed_output_dim = 512
+        self.lstm_output_dim = 2
         self.vocab_size = 12099
         pass
 
     def checkShape(self):
         # anchor = np.random.random((1111, 15))
-        anchor = tf.random.uniform(shape=(1111, 15), minval=1, maxval=self.vocab_size, dtype=tf.dtypes.int32)
+        anchor = tf.random.uniform(shape=(3, 15), minval=1, maxval=self.vocab_size, dtype=tf.dtypes.int32)
         # target = np.random.random((1111, 15))
-        target = tf.random.uniform(shape=(1111, 15), minval=1, maxval=self.vocab_size, dtype=tf.dtypes.int32)
+        target = tf.random.uniform(shape=(3, 15), minval=1, maxval=self.vocab_size, dtype=tf.dtypes.int32)
         # Embedding층에 들어갈 입력 두개. 원핫인코딩이 되지 않은 상태이며,
         # 따라서 (batch_size, input_length) 인데 임베딩층을 거치면 (batch_size, input_length, embed_output_dim) 이 된다.
 
         logger.debug("model Input shape : {}, {}".format(anchor.shape, target.shape))
 
-        anchor_embed = Embedding(self.vocab_size, self.output_dim, mask_zero=True
+        anchor_embed = Embedding(self.vocab_size, self.embed_output_dim, mask_zero=True
                                  # , input_length=self.train_X_len
                                  )
         x = anchor_embed(anchor)
         print('anchor embed shape : ', x.shape)
-        anchor_lstm = LSTM(units=256)  # return_state=True이면 list형태로 3개의 텐서, result, state_c, state_h 가 반환됨.
+        anchor_lstm = LSTM(
+            units=self.lstm_output_dim)  # return_state=True이면 list형태로 3개의 텐서, result, state_c, state_h 가 반환됨.
         anchor_output = anchor_lstm(x)
 
-        target_embed = Embedding(self.vocab_size, self.output_dim, mask_zero=True
+        target_embed = Embedding(self.vocab_size, self.embed_output_dim, mask_zero=True
                                  # , input_length=self.train_X_len
                                  )
         y = target_embed(target)
         print('target embed shape : ', y.shape)
-        target_lstm = LSTM(units=256)
+        target_lstm = LSTM(units=self.lstm_output_dim)
         target_output = target_lstm(y)
 
         print('lstm output shape : ', anchor_output.shape, target_output.shape)
 
-        # anchor_output = self.customNorm(anchor_output, axis=1)
-        anchor_norm = tf.expand_dims(anchor_output, 2)
-        print('anchor norm shape : ', anchor_norm.shape)
-
-        # anchor_output = self.customNorm(target_output, axis=1)
-        target_norm = tf.expand_dims(anchor_output, 2)
-        print('target norm shape : ', target_norm.shape)
-
-        # 그냥 * 로는 원하는 모양으로 행렬곱이 되지 않아 matmul 사용
-        # cosine_sim = tf.matmul(anchor_norm, target_norm)
-
-        cosine_loss = CosineSimilarity(axis=1, reduction=Reduction.NONE)
-        cosine_sim = cosine_loss(anchor_norm, target_norm)
-
-        print('after matmul cosine_sim shape : ', cosine_sim.shape)
-        # print('after matmul cosine_sim : ', cosine_sim)
-        cosine_sim = tf.reshape(cosine_sim, [-1, 1])
-        print('after matmul cosine_sim shape2 : ', cosine_sim.shape)
-        # print('after matmul cosine_sim2 : ', cosine_sim)
+        option = 'manual'
+        cosine_sim = self.calc_cosine_sim(anchor_output, option, target_output)
 
         # 3d shape tensor 그 이상에서는 행렬곱을 하고싶은 위치만 transpose되어야 행렬곱 가능.
         # expand_dims로 shape 조정 (복잡할때는 transpose이용하여 shape 조정 가능)
@@ -322,21 +333,54 @@ class Test:
 
         print('cosine sim shape : ', cosine_sim.shape)
 
+    def calc_cosine_sim(self, anchor_output, option, target_output):
+        if option == 'useLoss':
+            # anchor_norm = self.customNorm(anchor_output, axis=1)
+            anchor_norm = tf.expand_dims(anchor_output, 2)
+            logger.debug('anchor norm shape : {}'.format(anchor_norm.shape))
+
+            # target_norm = self.customNorm(target_output, axis=1)
+            target_norm = tf.expand_dims(anchor_output, 2)
+            logger.debug('target norm shape : {}'.format(target_norm.shape))
+
+            # 그냥 * 로는 원하는 모양으로 행렬곱이 되지 않아 matmul 사용
+            # 3d shape tensor 그 이상에서는 행렬곱을 하고싶은 위치만 transpose되어야 행렬곱 가능.
+            # expand_dims로 shape 조정 (복잡할때는 transpose이용하여 shape 조정 가능)
+
+            # cosine_sim = tf.matmul(anchor_norm, target_norm)
+
+            cosine_loss = CosineSimilarity(axis=1, reduction=Reduction.NONE)
+            # cosine_loss는 -1로갈수록 유사도가 높아짐.
+            cosine_sim = cosine_loss(anchor_norm, target_norm)
+
+            logger.debug('after matmul cosine_sim shape : {}'.format(cosine_sim.shape))
+            cosine_sim = tf.reshape(cosine_sim, [-1, 1])
+            logger.debug('after matmul cosine_sim shape : {}'.format(cosine_sim.shape))
+
+        elif option == 'manual':
+            anchor_norm = self.customNorm(anchor_output, axis=1)
+            anchor_norm = tf.expand_dims(anchor_norm, 1)
+            logger.debug('anchor norm shape : {}'.format(anchor_norm.shape))
+
+            target_norm = self.customNorm(target_output, axis=1)
+            target_norm = tf.expand_dims(target_norm, 2)
+            logger.debug('target norm shape : {}'.format(target_norm.shape))
+
+            print('before matmul : \n anchor_norm = {} \n target_norm = {}'.format(anchor_norm, target_norm))
+            cosine_sim = tf.matmul(anchor_norm, target_norm)
+            print('after matmul : \n cosine_sim = {}'.format(cosine_sim))
+
+            logger.debug('after matmul cosine_sim shape : {}'.format(cosine_sim.shape))
+            cosine_sim = tf.reshape(cosine_sim, [-1, 1])
+            logger.debug('after matmul cosine_sim shape : {}'.format(cosine_sim.shape))
+        return cosine_sim
+
     def customNorm(self, tensor, axis=1):
         print('customNorm : input tensor shape = ', tensor.shape)
-        # print(tensor)
-        # norm = tf.norm(tensor, ord=1, axis=axis)
-        norm = tf.nn.l2_normalize(tensor,axis=axis)
-        # print('customNorm : norm val shape = ', norm)
-        norm = tf.expand_dims(norm, 1)
+        norm = tf.nn.l2_normalize(tensor, axis=axis)
+        print('customNorm : after norm shape = ', norm.shape)
 
-        normTensor = tensor / norm
-
-        # print('customNorm : after norm = ', normTensor)
-        print('customNorm : after norm shape = ', normTensor.shape)
-
-        return tensor
-
+        return norm
 
 
 if __name__ == "__main__":
@@ -347,7 +391,8 @@ if __name__ == "__main__":
     # f.predictTest()
 
     f = FirstModel()
-    f.loadModel()
-    # f.predictTest()
-    f.predictAllTrainData()
+    # f.loadModel()
+    f.predictTestData()
+    # f.predictAllTrainData()
+
     # Test().checkShape()

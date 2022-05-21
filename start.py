@@ -19,7 +19,7 @@ OPTION_LEARNING = "--learn"
 OPTION_PREDICT = "--predict"
 
 # 테스트
-OPTION_FLOW_TEST = "--flowtest"
+OPTION_TEST = "--test"
 
 LOGGER_NAME = "MAIN"
 logger = LogManager().get_logger(LOGGER_NAME, PARAM.LOG_COMMON_FILE)
@@ -50,11 +50,14 @@ def runTask(TASK_NAME, MODEL_TYPE, option):
                 f.saveModel()
             elif option == OPTION_PREDICT:
                 f = build.FirstModel()
+                f.preprocessing()
                 f.loadModel()
                 # f.predictTest()
-                f.predictAllTrainData()
-            elif option == OPTION_FLOW_TEST:
-                build.Test().checkShape()
+                # f.predictAllTrainData()
+                f.predictTestData()
+            elif option == OPTION_TEST:
+                f = build.Test()
+                f.checkShape()
 
 
 if __name__ == "__main__":
