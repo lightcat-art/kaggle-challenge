@@ -9,7 +9,7 @@ from keras.layers import Flatten
 from tensorflow import keras
 import tensorflow as tf
 from tensorflow.keras.utils import normalize
-from tensorflow.keras.layers import Input, LSTM, Embedding, Dense
+from tensorflow.keras.layers import Input, LSTM, Embedding, Dense, Layer
 from tensorflow.keras.models import Model
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 from sklearn.metrics.pairwise import cosine_similarity
@@ -114,29 +114,9 @@ class FirstModel:
 
         logger.debug('model Input shape : {}, {}'.format(anchor.shape, target.shape))
 
-        anchor_embed = Embedding(self.vocab_size, self.output_dim, mask_zero=True
-                                 , input_length=self.train_X_len
-                                 )
-        x = anchor_embed(anchor)
-        logger.debug('anchor embed shape : {}'.format(x.shape))
-        anchor_lstm = LSTM(units=256)  # return_state=True이면 list형태로 3개의 텐서, result, state_c, state_h 가 반환됨.
-        anchor_output = anchor_lstm(x)
+        cos_sim_layer = MseLayer(self.vocab_size, self.output_dim, self.train_X_len)
 
-        target_embed = Embedding(self.vocab_size, self.output_dim, mask_zero=True
-                                 , input_length=self.train_X_len
-                                 )
-        y = target_embed(target)
-        logger.debug('target embed shape : {}'.format(y.shape))
-        target_lstm = LSTM(units=256)
-        target_output = target_lstm(y)
-
-        logger.debug('lstm output shape : {}, {}'.format(anchor_output.shape, target_output.shape))
-
-        option = 'manual'
-
-        cosine_sim = self.calc_cosine_sim(anchor_output, option, target_output)
-
-        cosine_sim = tf.divide(cosine_sim + 1, 2, name='output_cos_sim')
+        cosine_sim = cos_sim_layer(anchor, target)
 
         self.model = Model(inputs=[anchor, target], outputs=cosine_sim)
 
@@ -165,52 +145,6 @@ class FirstModel:
                        )
         # except Exception as ex:
         #     print('error occured..', ex)
-
-    def calc_cosine_sim(self, anchor_output, option, target_output):
-        if option == 'useLoss':
-            # anchor_norm = self.customNorm(anchor_output, axis=1)
-            anchor_norm = tf.expand_dims(anchor_output, 2)
-            logger.debug('anchor norm shape : {}'.format(anchor_norm.shape))
-
-            # target_norm = self.customNorm(target_output, axis=1)
-            target_norm = tf.expand_dims(anchor_output, 2)
-            logger.debug('target norm shape : {}'.format(target_norm.shape))
-
-            # 그냥 * 로는 원하는 모양으로 행렬곱이 되지 않아 matmul 사용
-            # 3d shape tensor 그 이상에서는 행렬곱을 하고싶은 위치만 transpose되어야 행렬곱 가능.
-            # expand_dims로 shape 조정 (복잡할때는 transpose이용하여 shape 조정 가능)
-
-            # cosine_sim = tf.matmul(anchor_norm, target_norm)
-
-            cosine_loss = CosineSimilarity(axis=1, reduction=Reduction.NONE)
-            # cosine_loss는 -1로갈수록 유사도가 높아짐.
-            cosine_sim = cosine_loss(anchor_norm, target_norm)
-
-            logger.debug('after matmul cosine_sim shape : {}'.format(cosine_sim.shape))
-            cosine_sim = tf.reshape(cosine_sim, [-1, 1])
-            logger.debug('after matmul cosine_sim shape : {}'.format(cosine_sim.shape))
-
-        elif option == 'manual':
-            anchor_norm = self.customNorm(anchor_output, axis=1)
-            anchor_norm = tf.expand_dims(anchor_norm, 1)
-            logger.debug('anchor norm shape : {}'.format(anchor_norm.shape))
-
-            target_norm = self.customNorm(target_output, axis=1)
-            target_norm = tf.expand_dims(target_norm, 2)
-            logger.debug('target norm shape : {}'.format(target_norm.shape))
-
-            cosine_sim = tf.matmul(anchor_norm, target_norm)
-
-            logger.debug('after matmul cosine_sim shape : {}'.format(cosine_sim.shape))
-            cosine_sim = tf.reshape(cosine_sim, [-1, 1])
-            logger.debug('after matmul cosine_sim shape : {}'.format(cosine_sim.shape))
-        return cosine_sim
-
-    def customNorm(self, tensor, axis=1):
-        norm = tf.nn.l2_normalize(tensor, axis=axis)
-        logger.debug('customNorm : after norm shape = {}'.format(norm.shape))
-
-        return norm
 
     def saveModel(self):
         # format_data = "%d%m%y%H%M%S"
@@ -354,6 +288,86 @@ class FirstModel:
 
     # def runFlask(self):
     #     app.run(debug=True)
+
+
+class MseLayer(Layer):
+    def __init__(self, vocab_size, output_dim, train_X_len):
+        super(MseLayer, self).__init__()
+        self.vocab_size = vocab_size
+        self.output_dim = output_dim
+        self.train_X_len = train_X_len
+        self.anchor_embed = Embedding(self.vocab_size, self.output_dim, mask_zero=True
+                                 , input_length=self.train_X_len)
+        self.target_embed = Embedding(self.vocab_size, self.output_dim, mask_zero=True
+                                      , input_length=self.train_X_len)
+        self.anchor_lstm = LSTM(units=256)
+        self.target_lstm = LSTM(units=256)
+        self.cosine_loss = CosineSimilarity(axis=1, reduction=Reduction.NONE)
+
+    def call(self, anchor_inputs, target_inputs):
+        x = self.anchor_embed(anchor_inputs)
+        logger.debug('anchor embed shape : {}'.format(x.shape))
+        anchor_output = self.anchor_lstm(x)
+
+        y = self.target_embed(target_inputs)
+        logger.debug('target embed shape : {}'.format(y.shape))
+        target_output = self.target_lstm(y)
+
+        logger.debug('lstm output shape : {}, {}'.format(anchor_output.shape, target_output.shape))
+
+        option = 'manual'
+
+        cosine_sim = self.calc_cosine_sim(anchor_output, option, target_output)
+
+        cosine_sim = tf.divide(cosine_sim + 1, 2, name='output_cos_sim')
+
+        return cosine_sim
+
+    def calc_cosine_sim(self, anchor_output, option, target_output):
+        if option == 'useLoss':
+            # anchor_norm = self.customNorm(anchor_output, axis=1)
+            anchor_norm = tf.expand_dims(anchor_output, 2)
+            logger.debug('anchor norm shape : {}'.format(anchor_norm.shape))
+
+            # target_norm = self.customNorm(target_output, axis=1)
+            target_norm = tf.expand_dims(anchor_output, 2)
+            logger.debug('target norm shape : {}'.format(target_norm.shape))
+
+            # 그냥 * 로는 원하는 모양으로 행렬곱이 되지 않아 matmul 사용
+            # 3d shape tensor 그 이상에서는 행렬곱을 하고싶은 위치만 transpose되어야 행렬곱 가능.
+            # expand_dims로 shape 조정 (복잡할때는 transpose이용하여 shape 조정 가능)
+
+            # cosine_sim = tf.matmul(anchor_norm, target_norm)
+
+
+            # cosine_loss는 -1로갈수록 유사도가 높아짐.
+            cosine_sim = self.cosine_loss(anchor_norm, target_norm)
+
+            logger.debug('after matmul cosine_sim shape : {}'.format(cosine_sim.shape))
+            cosine_sim = tf.reshape(cosine_sim, [-1, 1])
+            logger.debug('after matmul cosine_sim shape : {}'.format(cosine_sim.shape))
+
+        elif option == 'manual':
+            anchor_norm = self.customNorm(anchor_output, axis=1)
+            anchor_norm = tf.expand_dims(anchor_norm, 1)
+            logger.debug('anchor norm shape : {}'.format(anchor_norm.shape))
+
+            target_norm = self.customNorm(target_output, axis=1)
+            target_norm = tf.expand_dims(target_norm, 2)
+            logger.debug('target norm shape : {}'.format(target_norm.shape))
+
+            cosine_sim = tf.matmul(anchor_norm, target_norm)
+
+            logger.debug('after matmul cosine_sim shape : {}'.format(cosine_sim.shape))
+            cosine_sim = tf.reshape(cosine_sim, [-1, 1])
+            logger.debug('after matmul cosine_sim shape : {}'.format(cosine_sim.shape))
+        return cosine_sim
+
+    def customNorm(self, tensor, axis=1):
+        norm = tf.nn.l2_normalize(tensor, axis=axis)
+        logger.debug('customNorm : after norm shape = {}'.format(norm.shape))
+
+        return norm
 
 
 class Test:
