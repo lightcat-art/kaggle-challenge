@@ -21,6 +21,9 @@ OPTION_PREDICT = "--predict"
 # 테스트
 OPTION_TEST = "--test"
 
+# GRPC 예측
+OPTION_GRPC = "--grpc"
+
 LOGGER_NAME = "MAIN"
 logger = LogManager().get_logger(LOGGER_NAME, PARAM.LOG_COMMON_FILE)
 
@@ -52,12 +55,14 @@ def runTask(TASK_NAME, MODEL_TYPE, option):
                 f = build.FirstModel()
                 f.preprocessing()
                 f.loadModel()
-                # f.predictTest()
-                # f.predictAllTrainData()
                 f.predictTestData()
             elif option == OPTION_TEST:
                 f = build.Test()
                 f.checkShape()
+            elif option == OPTION_GRPC:
+                f = build.FirstModel()
+                f.preprocessing()
+                f.predictByGrpc()
 
 
 if __name__ == "__main__":
