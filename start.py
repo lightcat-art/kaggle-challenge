@@ -18,6 +18,9 @@ OPTION_LEARNING = "--learn"
 # 모델 예측
 OPTION_PREDICT = "--predict"
 
+# 모델 학습데이터 검증
+OPTION_VALIDATE = "--val"
+
 # 테스트
 OPTION_TEST = "--test"
 
@@ -56,6 +59,11 @@ def runTask(TASK_NAME, MODEL_TYPE, option):
                 f.preprocessing()
                 f.loadModel()
                 f.predictTestData()
+            elif option == OPTION_VALIDATE:
+                f = build.FirstModel()
+                f.preprocessing()
+                f.loadModel()
+                f.predictPartTrainData()
             elif option == OPTION_TEST:
                 f = build.Test()
                 f.checkShape()

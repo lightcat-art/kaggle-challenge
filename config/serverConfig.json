@@ -1,8 +1,8 @@
 {
     "PATH_HOME": "C:/Users/KDH/PycharmProjects/Kaggle",
+    "RESOURCES_HOME": "E:/Kaggle",
     "PATH_LOGS": "logs",
     "PATH_MODEL": "model",
-    "LOG_LEVEL": "DEBUG",
-    "RESOURCES_HOME": "E:/Kaggle",
-    "RESOURCES_FOLDER": "resources"
+    "RESOURCES_FOLDER": "resources",
+    "LOG_LEVEL": "DEBUG"
 }

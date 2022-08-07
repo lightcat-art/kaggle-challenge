@@ -146,18 +146,64 @@ class FirstModel:
         # except Exception as ex:
         #     print('error occured..', ex)
 
+    def createNewModelVer(self):
+        obj_list = os.listdir(os.path.join(path_manager.get_model_path(TASK_NAME, self.MODEL_TYPE),
+                                           self.model_config_dict.get(PARAM.PARAM_MODEL_NAME)))
+
+        max_model_ver = 0
+        for obj in obj_list:
+            model_ver = 0
+            print('obj name = {}, type of obj = {}'.format(obj, type(obj)))
+            if os.path.isdir(obj):
+                print('{} is dir.')
+
+            try:
+                model_ver = int(obj)
+            except Exception as e:
+                print('모델번호형식이 맞지 않습니다. 폴더 정리가 필요합니다 : {}'.format(obj))
+
+            if model_ver > max_model_ver:
+                max_model_ver = model_ver
+
+        return str(max_model_ver + 1)
+
+    def checkModelVer(self):
+        obj_list = os.listdir(os.path.join(path_manager.get_model_path(TASK_NAME, self.MODEL_TYPE),
+                                           self.model_config_dict.get(PARAM.PARAM_MODEL_NAME)))
+
+        max_model_ver = 0
+        for obj in obj_list:
+            model_ver = 0
+            print('obj name = {}, type of obj = {}'.format(obj, type(obj)))
+            if os.path.isdir(obj):
+                print('{} is dir.')
+
+            try:
+                model_ver = int(obj)
+            except Exception as e:
+                print('모델번호형식이 맞지 않습니다. 폴더 정리가 필요합니다 : {}'.format(obj))
+
+            if model_ver > max_model_ver:
+                max_model_ver = model_ver
+
+        return str(max_model_ver)
+
     def saveModel(self):
         # format_data = "%d%m%y%H%M%S"
         # date = datetime.strftime(datetime.now(), format_data)
         # modelName = "mseModel_{}.h5".format(date)
+
+        MODEL_VER = self.createNewModelVer()
         self.model.save(os.path.join(path_manager.get_model_path(TASK_NAME, self.MODEL_TYPE),
-                                     self.model_config_dict.get(PARAM.PARAM_MODEL_NAME)))
+                                     self.model_config_dict.get(PARAM.PARAM_MODEL_NAME), MODEL_VER))
 
     def loadModel(self):
         logger.debug('load model start')
         logger.debug('model name = {}'.format(self.model_config_dict.get(PARAM.PARAM_MODEL_NAME)))
+        MODEL_VER = self.checkModelVer()
         self.model = keras.models.load_model(os.path.join(path_manager.get_model_path(TASK_NAME, self.MODEL_TYPE),
-                                                          self.model_config_dict.get(PARAM.PARAM_MODEL_NAME)))
+                                                          self.model_config_dict.get(PARAM.PARAM_MODEL_NAME),
+                                                          MODEL_VER))
         self.preprocessing()
         # df = pd.read_csv(os.path.join(server_config.get_param(PARAM.PARAM_RESOURCES_HOME),
         #                               server_config.get_param(PARAM.PARAM_RESOURCES_FOLDER),
@@ -186,11 +232,12 @@ class FirstModel:
         # self.train_2_X = train_X[len(df):]
 
     def predictPartTrainData(self):
-        anchor = self.train_1_X[0:2]
-        target = self.train_2_X[0:2]
+        val_size = 100
+        anchor = self.train_1_X[0:val_size]
+        target = self.train_2_X[0:val_size]
         logger.debug('anchor shape : ({},{})'.format(len(anchor), len(anchor[0])))
         logger.debug('target shape : ({},{})'.format(len(target), len(target[0])))
-        simScore = self.train_y[0:2]
+        simScore = self.train_y[0:val_size]
         logger.debug('simScore : {}'.format(simScore))
         # anchor = self.tokenizer.decode(anchor)
         # anchor = pad_sequences(anchor, maxlen=self.anchor_len)
@@ -297,7 +344,7 @@ class MseLayer(Layer):
         self.output_dim = output_dim
         self.train_X_len = train_X_len
         self.anchor_embed = Embedding(self.vocab_size, self.output_dim, mask_zero=True
-                                 , input_length=self.train_X_len)
+                                      , input_length=self.train_X_len)
         self.target_embed = Embedding(self.vocab_size, self.output_dim, mask_zero=True
                                       , input_length=self.train_X_len)
         self.anchor_lstm = LSTM(units=256)
@@ -338,7 +385,6 @@ class MseLayer(Layer):
             # expand_dims로 shape 조정 (복잡할때는 transpose이용하여 shape 조정 가능)
 
             # cosine_sim = tf.matmul(anchor_norm, target_norm)
-
 
             # cosine_loss는 -1로갈수록 유사도가 높아짐.
             cosine_sim = self.cosine_loss(anchor_norm, target_norm)

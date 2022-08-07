@@ -1,17 +1,17 @@
 {
   "PATENTMATCHING": {
-    "1": {
+    "MSE": {
       "MODEL_NAME": "MseModel_EPOCH_200_BATCH_64_V1",
-      "MODEL_CHECKPOINT_NAME": "ckpt_{epoch:03d}_{val_loss:.5f}_{val_accuracy:.5f}",
+      "MODEL_CHECKPOINT_NAME": "ckpt_{epoch:03d}_{val_loss:.5f}_{val_mse:.5f}",
       "BATCH_SIZE": 64,
-      "EPOCHS": 200,
+      "EPOCHS": 1,
       "OPTIMIZER": "rmsprop",
       "LOSS": "mse",
-      "METRICS": "accuracy",
+      "METRICS": "mse",
       "VAL_SPLIT": 0.2
     },
-    "2": {
-      "MODEL_NAME": "MseModel2",
+    "OTHERS": {
+      "MODEL_NAME": "OtherModel",
       "BATCH_SIZE": 64,
       "EPOCHS": 200,
       "OPTIMIZER": "rmsprop",
