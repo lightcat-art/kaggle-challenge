@@ -40,7 +40,7 @@ model_config = ModelConfigManager()
 PATH_HOME = server_config.get_param(PARAM.PARAM_PATH_HOME, "./")
 TASK_NAME = TaskMap.PATENTMATCHING.name  # modelConfig.json의 TASK_NAME과 동일해야함
 logger = LogManager().get_logger(TASK_NAME, PARAM.LOG_COMMON_FILE)
-
+TOKENIZER_FILE_NAME = 'tokenizer_save'
 app = Flask(__name__)
 
 
@@ -105,6 +105,14 @@ class FirstModel:
         logger.debug('padding 후 anchor shape : [ {} , {} ]'.format(len(self.train_1_X), len(self.train_1_X[0])))
         logger.debug('padding 후 target shape : [ {} , {} ]'.format(len(self.train_2_X), len(self.train_2_X[0])))
         logger.debug('label shape : {}'.format(self.train_y.shape))
+
+    def makeTokenizerDic(self):
+        self.tokenizer.save_to_file(
+            os.path.join(path_manager.get_data_path(TASK_NAME, self.MODEL_TYPE), TOKENIZER_FILE_NAME))
+
+    def loadTokenizerDic(self):
+        self.tokenizer = tfds.deprecated.text.SubwordTextEncoder.load_from_file(
+            os.path.join(path_manager.get_data_path(TASK_NAME, self.MODEL_TYPE), TOKENIZER_FILE_NAME))
 
     def makeModel(self):
         anchor = Input(shape=(self.train_X_len,), name='anchor_input')
