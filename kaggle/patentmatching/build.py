@@ -27,6 +27,7 @@ from tensorflow.keras.callbacks import ModelCheckpoint
 import os
 from flask import Flask
 from flask import jsonify
+import json
 
 from tensorboard_plugin_wit._vendor.tensorflow_serving.apis import prediction_service_pb2_grpc
 from tensorboard_plugin_wit._vendor.tensorflow_serving.apis import get_model_metadata_pb2
@@ -40,7 +41,6 @@ model_config = ModelConfigManager()
 PATH_HOME = server_config.get_param(PARAM.PARAM_PATH_HOME, "./")
 TASK_NAME = TaskMap.PATENTMATCHING.name  # modelConfig.json의 TASK_NAME과 동일해야함
 logger = LogManager().get_logger(TASK_NAME, PARAM.LOG_COMMON_FILE)
-TOKENIZER_FILE_NAME = 'tokenizer_save'
 app = Flask(__name__)
 
 
@@ -61,6 +61,7 @@ class FirstModel:
         self.output_dim = 512
         self.model = None
         self.tokenizer = None
+        self.preprocess_info = {}
 
         pass
 
@@ -98,6 +99,7 @@ class FirstModel:
         train_X_max_val = max([max(line) for line in train_X])
         logger.debug('max_val on train_X : {}'.format(train_X_max_val))
         train_X = pad_sequences(train_X, maxlen=self.train_X_len)
+        self.preprocess_info.update({PARAM.PARAM_MAX_PAD_LEN:self.train_X_len})
 
         self.train_1_X = train_X[:len(df)]
         self.train_2_X = train_X[len(df):]
@@ -108,11 +110,28 @@ class FirstModel:
 
     def makeTokenizerDic(self):
         self.tokenizer.save_to_file(
-            os.path.join(path_manager.get_data_path(TASK_NAME, self.MODEL_TYPE), TOKENIZER_FILE_NAME))
+            os.path.join(path_manager.get_data_path(TASK_NAME, self.MODEL_TYPE), PARAM.PARAM_TOKENIZER_FILE_NAME))
 
     def loadTokenizerDic(self):
         self.tokenizer = tfds.deprecated.text.SubwordTextEncoder.load_from_file(
-            os.path.join(path_manager.get_data_path(TASK_NAME, self.MODEL_TYPE), TOKENIZER_FILE_NAME))
+            os.path.join(path_manager.get_data_path(TASK_NAME, self.MODEL_TYPE), PARAM.PARAM_TOKENIZER_FILE_NAME))
+
+    def makePreprocessInfo(self):
+        # self.preprocess_info.update({PARAM.PARAM_MAX_PAD_LEN:self.train_X_len})
+        pre_info_json = json.dumps(self.preprocess_info)
+        # pre_info_json = jsonify(self.preprocess_info)
+        prepro_info_file = os.path.join(path_manager.get_data_path(TASK_NAME, self.MODEL_TYPE),
+                                        PARAM.PARAM_PREPROCESS_INFO_FILE_NAME)
+        with open(prepro_info_file, 'w', encoding="utf-8") as wf:
+            wf.write(pre_info_json)
+
+    def loadPreprocessInfo(self):
+        prepro_info_file = os.path.join(path_manager.get_data_path(TASK_NAME, self.MODEL_TYPE),
+                                        PARAM.PARAM_PREPROCESS_INFO_FILE_NAME)
+        with open(prepro_info_file, 'r', encoding='utf-8') as rf:
+            data = json.load(rf)
+
+        self.preprocess_info.update(data)
 
     def makeModel(self):
         anchor = Input(shape=(self.train_X_len,), name='anchor_input')

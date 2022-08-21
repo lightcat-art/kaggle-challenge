@@ -137,6 +137,19 @@ class Params:
     def PARAM_VAL_SPLIT(self):
         return "VAL_SPLIT"
 
+    # PREPROCESS_INFO 관련 파라미터
+    @property
+    def PARAM_MAX_PAD_LEN(self):
+        return "MAX_PAD_LEN"
+
+    @property
+    def PARAM_TOKENIZER_FILE_NAME(self):
+        return "tokenizer_save.dat"
+
+    @property
+    def PARAM_PREPROCESS_INFO_FILE_NAME(self):
+        return "preprocess_info.dat"
+
 
 # 여기서 그냥 instance 생성해둠.
 PARAM = Params()

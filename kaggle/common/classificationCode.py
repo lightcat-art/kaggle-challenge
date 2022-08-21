@@ -3,7 +3,7 @@ from enum import Enum
 
 class TaskMap(Enum):
     """
-    TASK_NAME = {'MODEL_TYPE_NAME':'MODEL_TYPE'}
+    TASK_NAME = {'MODEL_TYPE_PARAM_NAME':'MODEL_TYPE_FOLDER_NAME'}
     """
     PATENTMATCHING = {'MSE': 'MSE'}
 
