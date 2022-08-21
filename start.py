@@ -1,7 +1,7 @@
 from typing import List
 
 from kaggle.common.logManager import LogManager
-from kaggle.patentmatching import build
+from kaggle.patentmatching import build, kafkaInference
 from kaggle.common.modelConfigManager import ModelConfigManager
 from kaggle.common.params import PARAM
 from kaggle.common.classificationCode import TaskMap
@@ -26,6 +26,12 @@ OPTION_TEST = "--test"
 
 # GRPC 예측
 OPTION_GRPC = "--grpc"
+
+# kafka inference produce
+OPTION_KAFKA_PRODUCE = "--kafka-produce"
+
+# kafka inference consume
+OPTION_KAFKA_CONSUME = "--kafka-consume"
 
 LOGGER_NAME = "MAIN"
 logger = LogManager().get_logger(LOGGER_NAME, PARAM.LOG_COMMON_FILE)
@@ -71,6 +77,16 @@ def runTask(TASK_NAME, MODEL_TYPE, option):
                 f = build.FirstModel()
                 f.preprocessing()
                 f.predictByGrpc()
+            elif option == OPTION_KAFKA_PRODUCE:
+                f = kafkaInference.KafkaInference()
+                # f.loadTokenizerDic()
+                # f.loadPreprocessInfo()
+                f.send_events()
+            elif option == OPTION_KAFKA_CONSUME:
+                f = kafkaInference.KafkaInference()
+                # f.loadTokenizerDic()
+                # f.loadPreprocessInfo()
+                f.consume_events()
 
 
 if __name__ == "__main__":

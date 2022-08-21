@@ -14,6 +14,8 @@ import os
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 import tensorflow_datasets as tfds
 import json
+# kafka
+from kafka import KafkaProducer, KafkaConsumer
 
 server_config = Config(None, PARAM.FILE_CONFIG)
 path_manager = PathManager()
@@ -28,6 +30,14 @@ class KafkaInference:
         self.tokenizer = None
         self.preprocess_info = {}
         self.MODEL_TYPE = TaskMap.PATENTMATCHING.value.get('MSE')  # modelConfig.json의 MODEL_TYPE과 동일해야함
+        self.TOPIC_NAME = 'kaggle-patent-matching'
+        # serialize our data to json for efficient transfer
+        self.producer = KafkaProducer(value_serializer=lambda msg: json.dumps(msg).encode('utf-8'),
+                                      bootstrap_servers=['localhost:9092'])
+        self.consumer = KafkaConsumer(self.TOPIC_NAME,
+                                      auto_offset_reset='earliest',  # where to start reading the messages at
+                                      group_id='kaggle-1', bootstrap_servers=['localhost:9092'],
+                                      value_deserializer=lambda m: json.loads(m.decode('utf-8')))
 
     def loadTokenizerDic(self):
         self.tokenizer = tfds.deprecated.text.SubwordTextEncoder.load_from_file(
@@ -41,18 +51,44 @@ class KafkaInference:
 
         self.preprocess_info.update(data)
 
+    def preprocessing(self, anchor, target):
+        anchor = [self.tokenizer.encode(elem) for elem in anchor]
+        target = [self.tokenizer.encode(elem) for elem in target]
+        anchor = pad_sequences(anchor, maxlen=self.preprocess_info.get(PARAM.PARAM_MAX_PAD_LEN))
+        target = pad_sequences(target, maxlen=self.preprocess_info.get(PARAM.PARAM_MAX_PAD_LEN))
+        return anchor, target
+
+    def _produce_event(self):
+        """
+        Function to produce events
+        """
+        # UUID produces a universal unique identifier
+        return {
+            'anchor': ['good choice', 'what a good man'],
+            'target': ['good select', 'what a nice boy']
+        }
+
+    def send_events(self):
+        data = self._produce_event()
+        print('sending = {}'.format(data))
+        result = self.producer.send(self.TOPIC_NAME, value=data)
+
+    def consume_events(self):
+        for m in self.consumer:
+            print("received : {}".format(m.value))
+
     def predictByGrpc(self, anchor, target):
+        # anchor과 target은 단건이라도 list형태로 들어옴을 보장.
         localhost = 'localhost'
         port = '8500'
 
         # 들어온 데이터에 대한 토크나이저 인코딩 및 패딩 필요!!!
-        # anchor = self.train_1_X[0:2]
-        # target = self.train_2_X[0:2]
+        anchor, target = self.preprocessing(anchor, target)
 
         logger.debug('anchor shape : ({},{})'.format(len(anchor), len(anchor[0])))
         logger.debug('target shape : ({},{})'.format(len(target), len(target[0])))
-        simScore = self.train_y[0:2]
-        logger.debug('simScore : {}'.format(simScore))
+        # simScore = self.train_y[0:2]
+        # logger.debug('simScore : {}'.format(simScore))
 
         with grpc.insecure_channel(f'{localhost}:{port}') as channel:
             stub = prediction_service_pb2_grpc.PredictionServiceStub(channel)
