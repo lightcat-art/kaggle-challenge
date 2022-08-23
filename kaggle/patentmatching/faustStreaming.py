@@ -11,6 +11,7 @@ import os
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 import tensorflow_datasets as tfds
 from kaggle.common.params import PARAM
+import json
 
 log = logging.getLogger(__name__)
 
@@ -24,8 +25,11 @@ class FaustOutputStream(faust.Record):
     score: int
 
 
+# faust.App([Consumer Group 명], broker='kafka://[host:port]'
+# faust 실행시 Consumer Group이 자동생성된다.
 app = faust.App('myapp', broker='kafka://localhost:9092')
 src_topic = app.topic('kaggle-patent-matching', value_type=str)
+# sink를 이용하여 destination topic으로 보내는 함수 이용시 타겟토픽이 자동생성된다.
 tgt_topic = app.topic('kaggle-patent-matching-output', value_type=str)
 
 
@@ -33,23 +37,24 @@ tgt_topic = app.topic('kaggle-patent-matching-output', value_type=str)
 async def predict(messages):
     async for messages in messages:
         if messages is not None:
-            log.info('message info : {}'.format(messages))
-
+            log.info('message info : {}, message type={}'.format(messages, type(messages)))
+            print('anchor={}, target={}'.format(messages['anchor'], messages['target']))
             # the yield keyword is used to send the message to the destination topic
-            yield "predict_output"
+            # yield "predict_output"
+            yield predictByGrpc(messages['anchor'], messages['target'])
 
             await sleep(2)
         else:
             log.info('No message received')
 
 
-def predictByGrpc(self, anchor, target):
+def predictByGrpc(anchor, target):
     # anchor과 target은 단건이라도 list형태로 들어옴을 보장.
     localhost = 'localhost'
     port = '8500'
 
     # 들어온 데이터에 대한 토크나이저 인코딩 및 패딩 필요!!!
-    anchor, target = self.preprocessing(anchor, target)
+    # anchor, target = self.preprocessing(anchor, target)
 
     print('anchor shape : ({},{})'.format(len(anchor), len(anchor[0])))
     print('target shape : ({},{})'.format(len(target), len(target[0])))
@@ -102,7 +107,12 @@ def predictByGrpc(self, anchor, target):
             print("PredictGrpc : serving_output element = {}".format(key))
             response.update({key: np.array(result.outputs[key].float_val)})
 
-        print(response)
+        print('response=',response)
+        print('response type=',type(response))
+        # if isinstance(response, np.ndarray):
+        #     response = response.tolist
+        return response['mse_layer'].tolist()
 
-if __name__=="__main__":
+
+if __name__ == "__main__":
     app.main()
