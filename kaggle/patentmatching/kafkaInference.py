@@ -25,7 +25,7 @@ TASK_NAME = TaskMap.PATENTMATCHING.name  # modelConfig.json의 TASK_NAME과 동�
 logger = LogManager().get_logger(TASK_NAME, PARAM.LOG_COMMON_FILE)
 
 
-class KafkaInference:
+class Producer:
     def __init__(self):
         self.tokenizer = None
         self.preprocess_info = {}
@@ -34,16 +34,16 @@ class KafkaInference:
         # serialize our data to json for efficient transfer
         self.producer = KafkaProducer(value_serializer=lambda msg: json.dumps(msg).encode('utf-8'),
                                       bootstrap_servers=['localhost:9092'])
-        self.consumer = KafkaConsumer(self.TOPIC_NAME,
-                                      auto_offset_reset='earliest',  # where to start reading the messages at
-                                      group_id='kaggle-1', bootstrap_servers=['localhost:9092'],
-                                      value_deserializer=lambda m: json.loads(m.decode('utf-8')))
+        self.loadTokenizerDic()
+        self.loadPreprocessInfo()
 
     def loadTokenizerDic(self):
+        logger.debug('load tokenizer dic.')
         self.tokenizer = tfds.deprecated.text.SubwordTextEncoder.load_from_file(
-            os.path.join(path_manager.get_data_path(TASK_NAME, self.MODEL_TYPE), PARAM.PARAM_TOKENIZER_FILE_NAME))
+            os.path.join(path_manager.get_data_path(TASK_NAME, self.MODEL_TYPE), PARAM.PARAM_TOKEN_FILE_NAME))
 
     def loadPreprocessInfo(self):
+        logger.debug('load preprocess info.')
         prepro_info_file = os.path.join(path_manager.get_data_path(TASK_NAME, self.MODEL_TYPE),
                                         PARAM.PARAM_PREPROCESS_INFO_FILE_NAME)
         with open(prepro_info_file, 'r', encoding='utf-8') as rf:
@@ -58,24 +58,23 @@ class KafkaInference:
         target = pad_sequences(target, maxlen=self.preprocess_info.get(PARAM.PARAM_MAX_PAD_LEN))
         return anchor, target
 
-    def _produce_event(self):
+    def produceEvent(self):
         """
         Function to produce events
         """
         # UUID produces a universal unique identifier
+        anchor = ['good choice', 'what a good man']
+        target = ['good select', 'what a nice boy']
+        anchor, target = self.preprocessing(anchor, target)
         return {
-            'anchor': ['good choice', 'what a good man'],
-            'target': ['good select', 'what a nice boy']
+            'anchor': anchor,
+            'target': target
         }
 
-    def send_events(self):
-        data = self._produce_event()
+    def sendEvents(self):
+        data = self.produceEvent()
         print('sending = {}'.format(data))
         result = self.producer.send(self.TOPIC_NAME, value=data)
-
-    def consume_events(self):
-        for m in self.consumer:
-            print("received : {}".format(m.value))
 
     def predictByGrpc(self, anchor, target):
         # anchor과 target은 단건이라도 list형태로 들어옴을 보장.
@@ -137,3 +136,16 @@ class KafkaInference:
                 response.update({key: np.array(result.outputs[key].float_val)})
 
             print(response)
+
+
+class Consumer:
+    def __init__(self):
+        self.TOPIC_NAME = 'kaggle-patent-matching-output'
+        self.consumer = KafkaConsumer(self.TOPIC_NAME,
+                                      auto_offset_reset='earliest',  # where to start reading the messages at
+                                      group_id='kaggle-1', bootstrap_servers=['localhost:9092'],
+                                      value_deserializer=lambda m: json.loads(m.decode('utf-8')))
+
+    def consumeEvents(self):
+        for m in self.consumer:
+            print("received : {}".format(m.value))

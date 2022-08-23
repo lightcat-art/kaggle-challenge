@@ -138,13 +138,15 @@ class Params:
         return "VAL_SPLIT"
 
     # PREPROCESS_INFO 관련 파라미터
+    # PATENTMATCHING 모듈의 문장 전처리 패딩 최대길이
     @property
     def PARAM_MAX_PAD_LEN(self):
         return "MAX_PAD_LEN"
 
+    # 토크나이저 파일명
     @property
-    def PARAM_TOKENIZER_FILE_NAME(self):
-        return "tokenizer_save.dat"
+    def PARAM_TOKEN_FILE_NAME(self):
+        return "tokenizer_save"
 
     @property
     def PARAM_PREPROCESS_INFO_FILE_NAME(self):

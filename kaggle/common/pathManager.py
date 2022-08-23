@@ -129,6 +129,20 @@ class PathManager:
 
         return target_path
 
+    def get_model_data_path(self, task_name, model_type, model_name):
+        """
+        지정된 모델이름으로 된 폴더 경로
+
+        Returns:
+            str : 대상 모델 폴더의 전체 경로
+        """
+        target_path = os.path.abspath(
+            os.path.join(self._PATH_RESOURCES_HOME, self._PATH_RESOURCES_FOLDER, task_name, model_type,
+                         PARAM.PATH_MODEL, model_name))
+        self._check_path(target_path)
+
+        return target_path
+
     def get_checkpoint_path(self, task_name, model_type, model_name, clear_option=False):
         """
         TASK의 체크포인트 저장할 폴더 경로

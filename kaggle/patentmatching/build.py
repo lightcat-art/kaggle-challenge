@@ -108,15 +108,15 @@ class FirstModel:
         logger.debug('padding 후 target shape : [ {} , {} ]'.format(len(self.train_2_X), len(self.train_2_X[0])))
         logger.debug('label shape : {}'.format(self.train_y.shape))
 
-    def makeTokenizerDic(self):
+    def saveTokenizerDic(self):
         self.tokenizer.save_to_file(
-            os.path.join(path_manager.get_data_path(TASK_NAME, self.MODEL_TYPE), PARAM.PARAM_TOKENIZER_FILE_NAME))
+            os.path.join(path_manager.get_data_path(TASK_NAME, self.MODEL_TYPE), PARAM.PARAM_TOKEN_FILE_NAME))
 
     def loadTokenizerDic(self):
         self.tokenizer = tfds.deprecated.text.SubwordTextEncoder.load_from_file(
-            os.path.join(path_manager.get_data_path(TASK_NAME, self.MODEL_TYPE), PARAM.PARAM_TOKENIZER_FILE_NAME))
+            os.path.join(path_manager.get_data_path(TASK_NAME, self.MODEL_TYPE), PARAM.PARAM_TOKEN_FILE_NAME))
 
-    def makePreprocessInfo(self):
+    def savePreprocessInfo(self):
         # self.preprocess_info.update({PARAM.PARAM_MAX_PAD_LEN:self.train_X_len})
         pre_info_json = json.dumps(self.preprocess_info)
         # pre_info_json = jsonify(self.preprocess_info)
@@ -174,8 +174,9 @@ class FirstModel:
         #     print('error occured..', ex)
 
     def createNewModelVer(self):
-        obj_list = os.listdir(os.path.join(path_manager.get_model_path(TASK_NAME, self.MODEL_TYPE),
-                                           self.model_config_dict.get(PARAM.PARAM_MODEL_NAME)))
+        obj_list = os.listdir(os.path.join(
+            path_manager.get_model_data_path(
+                TASK_NAME, self.MODEL_TYPE, self.model_config_dict.get(PARAM.PARAM_MODEL_NAME))))
 
         max_model_ver = 0
         for obj in obj_list:

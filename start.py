@@ -60,6 +60,8 @@ def runTask(TASK_NAME, MODEL_TYPE, option):
                 f.preprocessing()
                 f.makeModel()
                 f.saveModel()
+                f.savePreprocessInfo()
+                f.saveTokenizerDic()
             elif option == OPTION_PREDICT:
                 f = build.FirstModel()
                 f.preprocessing()
@@ -78,15 +80,15 @@ def runTask(TASK_NAME, MODEL_TYPE, option):
                 f.preprocessing()
                 f.predictByGrpc()
             elif option == OPTION_KAFKA_PRODUCE:
-                f = kafkaInference.KafkaInference()
+                f = kafkaInference.Producer()
                 # f.loadTokenizerDic()
                 # f.loadPreprocessInfo()
-                f.send_events()
+                f.sendEvents()
             elif option == OPTION_KAFKA_CONSUME:
-                f = kafkaInference.KafkaInference()
+                f = kafkaInference.Consumer()
                 # f.loadTokenizerDic()
                 # f.loadPreprocessInfo()
-                f.consume_events()
+                f.consumeEvents()
 
 
 if __name__ == "__main__":
